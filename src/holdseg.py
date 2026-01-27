@@ -2,13 +2,17 @@
 import json, os
 from typing import Any, Dict, Tuple
 from PIL import Image
+from pathlib import Path
 
 import torch
 from torch.utils.data import DataLoader, Dataset
 
+from tqdm import tqdm
+
 import torchvision
 
 # coco
+import pycocotools
 from pycocotools.coco import COCO
 from pycocotools import mask as coco_mask
 
@@ -48,10 +52,14 @@ class CocoSegDataset(Dataset):
         seg = ann.get("segmentation", None)
         if seg is None:
             raise ValueError("Annotation does not contain 'segmentation' field.")
-        if isinstance(seg, list):
-            raise NotImplementedError("Polygon segmentation is not supported in this implementation.")
-        if isinstance(seg, dict):
+        elif isinstance(seg, list):
+            rles = coco_mask.frPyObjects(seg, height, width)
+            rle = coco_mask.merge(rles)
+            m = coco_mask.decode(rle)
+        elif isinstance(seg, dict):
             m = coco_mask.decode(seg)
+        else:
+            raise TypeError("Segmentation format not supported.")
 
         m = (m>0).astype("uint8")
         return torch.from_numpy(m)
@@ -139,25 +147,77 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq: in
     loss = 0.0
     for step, (images, targets) in enumerate(data_loader):
         images = [img.to(device) for img in images]
-        targets = [{k: v.to(device) for k, v in t.items()} for t in targets]    
+        targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+
+        loss_dict = model(images, targets)
+        losses = sum(loss for loss in loss_dict.values())
+
+        loss_value = losses.item()
+        loss += loss_value
+
+        optimizer.zero_grad()
+        losses.backward()
+        optimizer.step()
+
+        if (step + 1) % print_freq == 0:
+            print(f"Epoch [{epoch+1}], Step [{step+1}/{len(data_loader)}], Loss: {loss_value:.4f}")
+
+    return loss / max(1,len(data_loader))
+
+def evaluate(model, data_loader, device, score_thresh: float = 0.5):
+    pass
 
 def main():
     num_classes = 2
     batch_size = 4
     lr = 0.005
+    weight_decay = 0.0005
     epochs = 10
 
-    train_img_dir = "path/to/train/images"
-    train_ann = "path/to/train/annotations.json"
+    ROOT_DIR = Path(__file__).resolve().parent.parent
+    DATA_DIR = ROOT_DIR / "data"
+    TRAIN_IMG_PATH = DATA_DIR / "images/bh"
+    TRAIN_ANN_PATH = DATA_DIR / "annotation/bh-coco.json"
 
+    if not torch.cuda.is_available():
+        raise EnvironmentError("CUDA device not found. A GPU is required to run this code.")
+    
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
 
     train_dataset = CocoSegDataset(
-        img_dir=train_img_dir,
-        ann_file=train_ann,
+        img_dir=TRAIN_IMG_PATH,
+        ann_file=TRAIN_ANN_PATH,
         transforms=None
     )
+
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=0,
+        pin_memory=True,
+        collate_fn=lambda x: tuple(zip(*x))
+    )
+
+    model_0 = get_maskrcnn_model(num_classes=num_classes)
+    model_0.to(device)
+
+    params = [p for p in model_0.parameters() if p.requires_grad]
+    optimizer = torch.optim.SGD(params, lr=lr,
+                                momentum=0.9, weight_decay=weight_decay)
+    
+    for epoch in tqdm(range(epochs)):
+        avg_loss = train_one_epoch(model_0, optimizer, train_loader, device, epoch, print_freq=50)
+        print(f"Epoch [{epoch+1}/{epochs}], Loss: {avg_loss:.4f}")
+
+        #evaluate(model_0, val_loader, device, score_thresh=0.5)
+
+        torch.save(model_0.state_dict(), f"maskrcnn_epoch{epoch+1}.pth")
+
+    print("Training complete.")
+    
+
 
 if __name__ == "__main__":
     main()
