@@ -178,6 +178,7 @@ def main():
     DATA_DIR = ROOT_DIR / "data"
     TRAIN_IMG_PATH = DATA_DIR / "images/bh"
     TRAIN_ANN_PATH = DATA_DIR / "annotation/bh-coco.json"
+    MODEL_SAVE_PATH = ROOT_DIR / "models/checkpoints"
 
     if not torch.cuda.is_available():
         raise EnvironmentError("CUDA device not found. A GPU is required to run this code.")
@@ -213,7 +214,7 @@ def main():
 
         #evaluate(model_0, val_loader, device, score_thresh=0.5)
 
-        torch.save(model_0.state_dict(), f"maskrcnn_epoch{epoch+1}.pth")
+        torch.save(model_0.state_dict(), MODEL_SAVE_PATH / f"maskrcnn_epoch{epoch+1}.pth")
 
     print("Training complete.")
     
