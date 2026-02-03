@@ -3,6 +3,7 @@
 data/images/
 
 # models
+models/*.pth
 models/checkpoints/
 
 # Byte-compiled / optimized / DLL files
