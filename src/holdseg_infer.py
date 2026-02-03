@@ -47,9 +47,10 @@ def main():
     img = Image.open(img_path).convert("RGB")
     w, h = img.size
 
-    img_tensor = torch.tensor(np.array(img)).permute(2, 0, 1).unsqueeze(0).to(device=device)
+    img_tensor = torch.tensor(np.array(img)).permute(2, 0, 1).unsqueeze(0).float() / 255.0
+    img_tensor = img_tensor.to(device=device)
 
-    output = model([img_tensor])[0]
+    output = model(img_tensor)[0]
 
     boxes = output["boxes"].cpu()
     scores = output["scores"].cpu()

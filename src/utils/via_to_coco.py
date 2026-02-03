@@ -169,15 +169,7 @@ def build_coco(
         with Image.open(img_path) as img:
             width, height = img.size
 
-        coco_images.append(
-            {
-                "id": img_id,
-                "file_name": filename,
-                "width": width,
-                "height": height,
-            }
-        )
-
+        valid_ann_for_image: List[Dict[str, Any]] = []
         for region in item.get("regions", []):
             try:
                 segmentation, bbox, area = region_to_coco(region)
@@ -192,7 +184,7 @@ def build_coco(
 
             extra_attrs = {k: v for k, v in region_attrs.items() if k != category_key}
 
-            coco_annotations.append(
+            valid_ann_for_image.append(
                 {
                     "id": ann_id,
                     "image_id": img_id,
@@ -205,6 +197,20 @@ def build_coco(
                 }
             )
             ann_id += 1
+
+        if not valid_ann_for_image:
+            logging.info("Skipping %s because it has no valid boxes.", filename)
+            continue
+
+        coco_images.append(
+            {
+                "id": img_id,
+                "file_name": filename,
+                "width": width,
+                "height": height,
+            }
+        )
+        coco_annotations.extend(valid_ann_for_image)
 
         img_id += 1
 

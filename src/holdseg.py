@@ -39,7 +39,12 @@ class CocoSegDataset(Dataset):
 
         self.img_dir = img_dir
         self.coco = COCO(ann_file)
-        self.img_ids = sorted(self.coco.getImgIds())
+        # keep only images that actually have annotations/boxes
+        all_img_ids = sorted(self.coco.getImgIds())
+        self.img_ids = [
+            img_id for img_id in all_img_ids
+            if len(self.coco.getAnnIds(imgIds=img_id)) > 0
+        ]
         self.transforms = transforms
 
     def __len__(self) -> int:
@@ -153,6 +158,9 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq: in
         images = [img.to(device) for img in images]
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
+        print(f"[DEBUG]: {[t['image_id'] for t in targets]}")
+
+
         loss_dict = model(images, targets)
         losses = sum(loss for loss in loss_dict.values())
 
@@ -193,7 +201,7 @@ def main():
     batch_size = 4
     lr = 0.005
     weight_decay = 0.0005
-    epochs = 3
+    epochs = 1
 
     ROOT_DIR = Path(__file__).resolve().parent.parent
     DATA_DIR = ROOT_DIR / "data"
