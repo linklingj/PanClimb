@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from PIL import Image
 import numpy as np
+import matplotlib.pyplot as plt
 
 import torchvision
 
@@ -97,7 +98,7 @@ class CocoSegDataset(Dataset):
             y2 = y1 + bbox[3]
             boxes.append([x1, y1, x2, y2])
 
-            labels.append(1) # ann["category_id"]) = 1
+            labels.append(ann["category_id"])
 
             masks.append(self.ann_to_mask(ann, height, width))
 
@@ -159,7 +160,7 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq: in
         images = [img.to(device) for img in images]
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
-        print(f"[DEBUG]: {[t['image_id'] for t in targets]}")
+        print(f"Training image IDs: {[t['image_id'].item() for t in targets]}")
 
 
         loss_dict = model(images, targets)
@@ -196,13 +197,36 @@ def evaluate(model, data_loader, device, score_thresh: float = 0.5):
 
     avg_preds = total_preds / max(1, total_imgs)
     print(f"[EVAL] Average Predictions per Image (score >= {score_thresh}): {avg_preds:.2f}")
+    return avg_preds
+
+def plot_train_results(train_results: List[Dict]):
+    plt.figure(figsize=(10,10))
+    epochs_list = [res["epoch"] for res in train_results]
+    losses_list = [res["train_loss"] for res in train_results]
+
+    plt.subplot(2,1,1)
+    plt.plot(epochs_list, losses_list, marker='o')
+    plt.title("Training Loss over Epochs")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.grid()
+
+    plt.subplot(2,1,2)
+    preds_list = [res["avg_predictions_per_image"] for res in train_results]
+    plt.plot(epochs_list, preds_list, marker='o', color='orange')
+    plt.title("Average Predictions per Image over Epochs")
+    plt.xlabel("Epoch")
+    plt.ylabel("Avg Predictions per Image")
+    plt.grid()
+    plt.show()
+
 
 def main():
-    num_classes = 2
+    num_classes = 3
     batch_size = 2
-    lr = 0.005
+    lr = 0.001
     weight_decay = 0.0005
-    epochs = 5
+    epochs = 3
 
     ROOT_DIR = Path(__file__).resolve().parent.parent
     DATA_DIR = ROOT_DIR / "data"
@@ -250,10 +274,6 @@ def main():
         pin_memory=False,
         collate_fn=lambda x: tuple(zip(*x))
     )
-    # print(len(train_dataset), len(test_dataset))
-    # for images, targets in train_loader:
-    #     for target in targets:
-    #         print(f"Boxes: {[t for t in target["boxes"]]}")
 
     model_0 = get_maskrcnn_model(num_classes=num_classes)
     model_0.to(device)
@@ -262,15 +282,20 @@ def main():
     optimizer = torch.optim.SGD(params, lr=lr,
                                 momentum=0.9, weight_decay=weight_decay)
     
+    train_result = []
+    
     for epoch in tqdm(range(epochs)):
-        avg_loss = train_one_epoch(model_0, optimizer, train_loader, device, epoch, print_freq=50)
-        print(f"Epoch [{epoch+1}/{epochs}], Loss: {avg_loss:.4f}")
+        train_loss = train_one_epoch(model_0, optimizer, train_loader, device, epoch, print_freq=50)
+        print(f"Epoch [{epoch+1}/{epochs}], Loss: {train_loss:.4f}")
 
-        evaluate(model_0, test_loader, device, score_thresh=0.5)
+        prediction_per_image = evaluate(model_0, test_loader, device, score_thresh=0.5)
+
+        train_result.append({"epoch": epoch+1, "train_loss": train_loss, "avg_predictions_per_image": prediction_per_image})
 
         torch.save(model_0.state_dict(), MODEL_SAVE_PATH / f"maskrcnn_epoch{epoch+1}.pth")
+        print(f"Model checkpoint saved at epoch {epoch+1}")
 
-    print("Training complete.")
+    plot_train_results(train_result)
 
     
 
