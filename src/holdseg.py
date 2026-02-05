@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from tqdm import tqdm
 from PIL import Image
+import numpy as np
 
 import torchvision
 
@@ -212,7 +213,7 @@ def main():
     MODEL_SAVE_PATH = ROOT_DIR / "models/checkpoints"
 
     # Show Train Dataset
-    coco_viewer(str(TRAIN_ANN_PATH), str(TRAIN_IMG_PATH))
+    # coco_viewer(str(TRAIN_ANN_PATH), str(TRAIN_IMG_PATH))
     
     if torch.cuda.is_available():
         device = "cuda"
@@ -249,6 +250,10 @@ def main():
         pin_memory=True,
         collate_fn=lambda x: tuple(zip(*x))
     )
+    # print(len(train_dataset), len(test_dataset))
+    # for images, targets in train_loader:
+    #     for target in targets:
+    #         print(f"Boxes: {[t for t in target["boxes"]]}")
 
     model_0 = get_maskrcnn_model(num_classes=num_classes)
     model_0.to(device)
@@ -257,15 +262,23 @@ def main():
     optimizer = torch.optim.SGD(params, lr=lr,
                                 momentum=0.9, weight_decay=weight_decay)
     
-    for epoch in tqdm(range(epochs)):
-        avg_loss = train_one_epoch(model_0, optimizer, train_loader, device, epoch, print_freq=50)
-        print(f"Epoch [{epoch+1}/{epochs}], Loss: {avg_loss:.4f}")
+    # for epoch in tqdm(range(epochs)):
+    #     avg_loss = train_one_epoch(model_0, optimizer, train_loader, device, epoch, print_freq=50)
+    #     print(f"Epoch [{epoch+1}/{epochs}], Loss: {avg_loss:.4f}")
 
-        evaluate(model_0, test_loader, device, score_thresh=0.5)
+    #     evaluate(model_0, test_loader, device, score_thresh=0.5)
 
-        torch.save(model_0.state_dict(), MODEL_SAVE_PATH / f"maskrcnn_epoch{epoch+1}.pth")
+    #     torch.save(model_0.state_dict(), MODEL_SAVE_PATH / f"maskrcnn_epoch{epoch+1}.pth")
 
-    print("Training complete.")
+    # print("Training complete.")
+
+    model_0.eval()
+    tmp_img = Image.open(DATA_DIR / "sample/theclimb1.jpeg").convert("RGB")
+    tmp_img.show()
+    img_tensor = torch.tensor(np.array(tmp_img)).permute(2, 0, 1).unsqueeze(0).float() / 255.0
+    result = model_0(img_tensor.to(device))
+    for box in result[0]['boxes']:
+        print(box)
     
 
 

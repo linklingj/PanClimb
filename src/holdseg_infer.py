@@ -28,19 +28,19 @@ def main():
     model_path = args.m
     img_path = args.i
     model = get_maskrcnn_model(num_classes=NUM_CLASSES)
-    checkpoint = torch.load(model_path, map_location=device)
-    if isinstance(checkpoint, dict):
-        if "state_dict" in checkpoint:
-            checkpoint = checkpoint["state_dict"]
-        elif "model" in checkpoint:
-            checkpoint = checkpoint["model"]
-    if isinstance(checkpoint, dict) and any(k.startswith("module.") for k in checkpoint.keys()):
-        checkpoint = {k.replace("module.", "", 1): v for k, v in checkpoint.items()}
-    missing, unexpected = model.load_state_dict(checkpoint, strict=False)
-    if missing:
-        print(f"[WARN] Missing keys when loading checkpoint: {len(missing)}")
-    if unexpected:
-        print(f"[WARN] Unexpected keys when loading checkpoint: {len(unexpected)}")
+    # checkpoint = torch.load(model_path, map_location=device)
+    # if isinstance(checkpoint, dict):
+    #     if "state_dict" in checkpoint:
+    #         checkpoint = checkpoint["state_dict"]
+    #     elif "model" in checkpoint:
+    #         checkpoint = checkpoint["model"]
+    # if isinstance(checkpoint, dict) and any(k.startswith("module.") for k in checkpoint.keys()):
+    #     checkpoint = {k.replace("module.", "", 1): v for k, v in checkpoint.items()}
+    # missing, unexpected = model.load_state_dict(checkpoint, strict=False)
+    # if missing:
+    #     print(f"[WARN] Missing keys when loading checkpoint: {len(missing)}")
+    # if unexpected:
+    #     print(f"[WARN] Unexpected keys when loading checkpoint: {len(unexpected)}")
     model.to(device=device)
     model.eval()
 
@@ -66,9 +66,11 @@ def main():
         x1, y1, x2, y2 = boxes[i].tolist()
         bbox = [x1, y1, x2 - x1, y2 - y1]  # Convert to [x, y, w, h] format
         mask = masks[i, 0].numpy() > 0.5
-        mask = mask.astype("uint8")
+        mask = mask.astype(np.uint8)
 
-        rle = coco_mask.encode(mask[:, :, None], order="F")[0]
+        # pycocotools expects a Fortran-contiguous array of shape (H, W, N)
+        mask_f = np.asfortranarray(mask[:, :, None])
+        rle = coco_mask.encode(mask_f)[0]
         rle["counts"] = rle["counts"].decode("utf-8")
         
         predictions.append({
