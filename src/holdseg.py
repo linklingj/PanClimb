@@ -224,16 +224,16 @@ def plot_train_results(train_results: List[Dict]):
 def main():
     num_classes = 3
     batch_size = 2
-    lr = 0.001
+    lr = 0.005
     weight_decay = 0.0005
-    epochs = 3
+    epochs = 10
 
     ROOT_DIR = Path(__file__).resolve().parent.parent
     DATA_DIR = ROOT_DIR / "data"
-    TRAIN_IMG_PATH = DATA_DIR / "images/bh"
-    TRAIN_ANN_PATH = DATA_DIR / "annotation/bh-coco.json"
-    TEST_IMG_PATH = DATA_DIR / "images/bh-phone"
-    TEST_ANN_PATH = DATA_DIR / "annotation/bh-phone-coco.json"
+    TRAIN_IMG_PATH = DATA_DIR / "images/combine"
+    TRAIN_ANN_PATH = DATA_DIR / "annotation/coco-combine.json"
+    TEST_IMG_PATH = DATA_DIR / "images/combine"
+    TEST_ANN_PATH = DATA_DIR / "annotation/coco-combine.json"
     MODEL_SAVE_PATH = ROOT_DIR / "models/checkpoints"
 
     # Show Train Dataset

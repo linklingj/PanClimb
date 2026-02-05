@@ -6,10 +6,10 @@ Indoor climbing Route Finding Project
 - PyTorch
 
 ### Plan
-1. User upload climbing gym image
-2. Hold segmentation
-3. Hold classification
-4. Route planning
-5. Visualize using unity model rigging
+1. Hold segmentation
+2. Hold type classification
+3. Route visualize
+4. Route solution
+5. Visualize solution using game engine rigging (unity)
 
 
