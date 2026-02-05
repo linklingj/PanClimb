@@ -17,7 +17,7 @@ args = parser.parse_args()
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-SCORE_THRESH = 0.5
+SCORE_THRESH = 0.3
 CATEGORY_ID = 1
 NUM_CLASSES = 2
 OUTPUT_JSON = "outputs/holdseg_predictions.json"
@@ -28,19 +28,19 @@ def main():
     model_path = args.m
     img_path = args.i
     model = get_maskrcnn_model(num_classes=NUM_CLASSES)
-    # checkpoint = torch.load(model_path, map_location=device)
-    # if isinstance(checkpoint, dict):
-    #     if "state_dict" in checkpoint:
-    #         checkpoint = checkpoint["state_dict"]
-    #     elif "model" in checkpoint:
-    #         checkpoint = checkpoint["model"]
-    # if isinstance(checkpoint, dict) and any(k.startswith("module.") for k in checkpoint.keys()):
-    #     checkpoint = {k.replace("module.", "", 1): v for k, v in checkpoint.items()}
-    # missing, unexpected = model.load_state_dict(checkpoint, strict=False)
-    # if missing:
-    #     print(f"[WARN] Missing keys when loading checkpoint: {len(missing)}")
-    # if unexpected:
-    #     print(f"[WARN] Unexpected keys when loading checkpoint: {len(unexpected)}")
+    checkpoint = torch.load(model_path, map_location=device)
+    if isinstance(checkpoint, dict):
+        if "state_dict" in checkpoint:
+            checkpoint = checkpoint["state_dict"]
+        elif "model" in checkpoint:
+            checkpoint = checkpoint["model"]
+    if isinstance(checkpoint, dict) and any(k.startswith("module.") for k in checkpoint.keys()):
+        checkpoint = {k.replace("module.", "", 1): v for k, v in checkpoint.items()}
+    missing, unexpected = model.load_state_dict(checkpoint, strict=False)
+    if missing:
+        print(f"[WARN] Missing keys when loading checkpoint: {len(missing)}")
+    if unexpected:
+        print(f"[WARN] Unexpected keys when loading checkpoint: {len(unexpected)}")
     model.to(device=device)
     model.eval()
 
@@ -74,17 +74,22 @@ def main():
         rle["counts"] = rle["counts"].decode("utf-8")
         
         predictions.append({
-            "image_id": randint(0, 1000),
+            "id": i,
+            "image_id": 1,
             "category_id": CATEGORY_ID,
+            "segmentation": rle,
             "bbox": bbox,
+            "area": int(mask.sum()),
             "score": score,
-            "segmentation": rle
+            "iscrowd": 0
         })
 
-
+    content = {"images": [{"id": 1, "width": w, "height": h, "file_name": Path(img_path).name}],
+               "annotations": predictions,
+               "categories": [{"id": CATEGORY_ID, "name": "hold"}]}
     Path(OUTPUT_JSON).parent.mkdir(parents=True, exist_ok=True)
     with open(OUTPUT_JSON, "w") as f:
-        json.dump(predictions, f)
+        json.dump(content, f)
 
     print(f"Saved {len(predictions)} predictions to {OUTPUT_JSON}")
 
